@@ -3,6 +3,10 @@ function expressionCalculator(expr) {
     //     Constants
     //--------------------------  
 
+    const EPS6 = 1E-6;
+    const ERROR_DIVIZION_BY_ZERO = 'TypeError: Division by zero.';
+    const ERROR_BRACKETS_MUST_BE_PAIRED = 'ExpressionError: Brackets must be paired';
+
     const OPEN_BRACKET = "(";
     const CLOSE_BRACKET = ")";
 
@@ -19,7 +23,12 @@ function expressionCalculator(expr) {
         '+': (x, y) => x + y,
         '-': (x, y) => x - y,
         '*': (x, y) => x * y,
-        '/': (x, y) => x / y
+        '/': (x, y) => {
+            if (Math.abs(y) < EPS6) {
+                throw new Error(ERROR_DIVIZION_BY_ZERO);
+            }
+            return x / y;
+        }
     };
 
     //--------------------------
@@ -29,44 +38,65 @@ function expressionCalculator(expr) {
     let opStack = [];
     let rpnStack = [];
 
-    let chars = [];
+    let tokens = [];
+    let buf = '';
     for (const ch of expr) {
-        if (ch == ' ') continue;
-        chars.push(ch);
-    }
-
-    for (const ch of chars) {
-        if (isOperation(ch)) {
-            if (opStack.length == 0) {
-                opStack.push(ch);
+        if (ch == ' ') {
+            continue;
+        }
+        else if (isOperation(ch)) {
+            if (buf.length > 0) {
+                tokens.push(buf);
+                buf = '';
             }
-            else if (isOperation(ch)) {
-                if (ch == OPEN_BRACKET) {
-                    opStack.push(ch);
+            tokens.push(ch);
+        }
+        else {
+            // numbers
+            buf += ch;
+        }
+    }
+    if (buf.length > 0) tokens.push(buf);
+
+    for (const token of tokens) {
+        if (isOperation(token)) {
+            if (opStack.length == 0) {
+                opStack.push(token);
+            }
+            else if (isOperation(token)) {
+                if (token == OPEN_BRACKET) {
+                    opStack.push(token);
                 }
-                else if (ch == CLOSE_BRACKET) {
+                else if (token == CLOSE_BRACKET) {
                     while (true) {
+                        if (opStack.length == 0) {
+                            throw new Error(ERROR_BRACKETS_MUST_BE_PAIRED);
+                        }
                         let op = opStack.pop();
-                        if (op == OPEN_BRACKET || opStack.length == 0) break;
+                        if (op == OPEN_BRACKET) break;
                         rpnStack.push(op);
                     }
                 }
                 else {
-                    while (opStack.length > 0 && PRIORITIES[peek(opStack)] >= PRIORITIES[ch]) {
+                    while (opStack.length > 0 && PRIORITIES[peek(opStack)] >= PRIORITIES[token]) {
                         let op = opStack.pop();
                         rpnStack.push(op);
                     }
-                    opStack.push(ch);
+                    opStack.push(token);
                 }
             }
         }
         else {
-            rpnStack.push(ch);
+            rpnStack.push(token);
         }
     }
 
     while (opStack.length > 0) {
-        rpnStack.push(opStack.pop());
+        let token = opStack.pop();
+        if (!isOperation(token) || token == OPEN_BRACKET) {
+            throw new Error(ERROR_BRACKETS_MUST_BE_PAIRED);
+        }
+        rpnStack.push(token);
     }
 
     let result = calculateRpn(rpnStack);
